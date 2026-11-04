@@ -1,0 +1,136 @@
+name: Build OilSlick
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -DOILSLICK_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 4
+
+      - name: Engine render test and CPU
+        shell: pwsh
+        run: |
+          build\Release\oilslick_render_test.exe | Tee-Object -FilePath cpu-windows-x64.txt
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Footswitch and expression test
+        shell: pwsh
+        run: |
+          build\oilslick_foot_test_artefacts\Release\oilslick_foot_test.exe
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Validate with pluginval
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip -OutFile pluginval.zip
+          Expand-Archive pluginval.zip -DestinationPath pluginval
+          $proc = Start-Process -FilePath .\pluginval\pluginval.exe -Wait -PassThru -NoNewWindow `
+            -RedirectStandardOutput pluginval-report.txt -RedirectStandardError pluginval-errors.txt `
+            -ArgumentList '--strictness-level 5 --validate-in-process --skip-gui-tests --timeout-ms 600000 --validate "build\OilSlick_artefacts\Release\VST3\OilSlick.vst3"'
+          Get-Content pluginval-report.txt -Tail 15
+          exit $proc.ExitCode
+
+      - name: Collect plugin
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item -Recurse "build\OilSlick_artefacts\Release\VST3\OilSlick.vst3" dist\
+          Copy-Item "build\OilSlick_artefacts\Release\Standalone\OilSlick.exe" "dist\OilSlick standalone.exe"
+          Copy-Item README.md, cpu-windows-x64.txt dist\
+          if (Test-Path pluginval-report.txt) { Copy-Item pluginval-report.txt dist\ }
+          Compress-Archive -Path dist\* -DestinationPath OilSlick-Windows.zip -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            OilSlick-Windows.zip
+            cpu-windows-x64.txt
+          retention-days: 1
+
+  # The live rig is a Raspberry Pi, so every plugin also builds for Linux ARM64.
+  linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q ninja-build pkg-config libasound2-dev libfreetype-dev libfontconfig1-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxcomposite-dev libxext-dev libgl1-mesa-dev
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOILSLICK_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --parallel 4
+
+      - name: Engine render test and CPU
+        run: |
+          set -o pipefail
+          ./build/oilslick_render_test | tee cpu-linux-arm64.txt
+
+      - name: Footswitch and expression test
+        run: ./build/oilslick_foot_test_artefacts/Release/oilslick_foot_test
+
+      - name: Collect plugin
+        run: |
+          mkdir -p dist
+          cp -r build/OilSlick_artefacts/Release/VST3/OilSlick.vst3 dist/
+          cp build/OilSlick_artefacts/Release/Standalone/OilSlick "dist/OilSlick standalone"
+          cp README.md cpu-linux-arm64.txt dist/
+          (cd dist && zip -qr ../OilSlick-Linux-ARM64.zip .)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64
+          path: |
+            OilSlick-Linux-ARM64.zip
+            cpu-linux-arm64.txt
+          retention-days: 1
+
+  # Artifact storage counts against the account quota, so the finished builds are
+  # published to a 'builds' branch, as in the other Flip Fella plugins.
+  publish:
+    needs: [windows, linux-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+
+      - name: Publish to the builds branch
+        run: |
+          mkdir site && cd site
+          cp ../out/windows/* ../out/linux-arm64/* .
+          {
+            echo "# OilSlick builds"
+            echo
+            echo "Built from ${GITHUB_SHA} on ${GITHUB_REF_NAME}."
+            echo
+            echo "- OilSlick-Windows.zip: the VST3 for Ableton on Windows, plus a standalone app"
+            echo "- OilSlick-Linux-ARM64.zip: the same for Linux ARM64 (the future Pi rig)"
+            echo "- cpu-*.txt: test results and CPU per instance at 48 kHz"
+          } > README.md
+          git init -q
+          git checkout -q -b builds
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Builds from ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" builds
