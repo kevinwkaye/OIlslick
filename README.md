@@ -88,8 +88,12 @@ Per instance, one core, Magic and both voices on (the heaviest case):
 
 | Machine | 48 kHz, 64 samples | 48 kHz, 128 samples |
 | --- | --- | --- |
-| Linux x64 cloud machine (V2) | 1.7% | 1.8% |
-| Linux x64 cloud machine (first edition) | 1.9% | 2.3% |
+| Windows x64, GitHub runner (V2) | 0.82% | 0.82% |
+| Windows x64, GitHub runner (first edition) | 0.86% | 0.85% |
+| Linux ARM64, GitHub runner (V2) | 1.19% | 1.18% |
+| Linux ARM64, GitHub runner (first edition) | 1.20% | 1.19% |
+
+Measured for v0.1 on 4 November 2026. A Raspberry Pi 5 core is slower than these runners, so expect a few times these figures there, still small.
 
 Every build writes fresh figures for Windows x64 and Linux ARM64 to `cpu-windows-x64.txt` and `cpu-linux-arm64.txt` on the builds branch.
 
