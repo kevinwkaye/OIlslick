@@ -1,0 +1,30 @@
+01_unison_chorus              48000 Hz  ok 
+02_third_up                   48000 Hz  ok 
+03_fourth_down                48000 Hz  ok 
+04_secondary_up               48000 Hz  ok 
+05_secondary_down             48000 Hz  ok 
+06_tracking_long              48000 Hz  ok 
+07_tracking_tight             48000 Hz  ok 
+08_tone_dark                  48000 Hz  ok 
+09_magic_repeats              48000 Hz  ok 
+10_magic_pixie_climb          48000 Hz  ok 
+11_magic_pixie_fall           48000 Hz  ok 
+12_magic_full_burn            48000 Hz  ok 
+13_magic_needs_a_voice        48000 Hz  ok 
+14_runaway_oscillates         48000 Hz  ok 
+15_tame_stops_it              48000 Hz  ok 
+16_freeze_holds               48000 Hz  ok 
+17_bypass_cuts                48000 Hz  ok 
+18_bypass_trails              48000 Hz  ok 
+19_jump_and_dive              48000 Hz  ok 
+20_tracking_sweep_warp        48000 Hz  ok 
+21_first_edition              48000 Hz  ok 
+22_first_edition_runaway      48000 Hz  ok 
+
+CPU per instance at 48 kHz (one core, Magic and both voices on):
+  V2              64 samples: 1.19%
+  V2             128 samples: 1.18%
+  First edition   64 samples: 1.20%
+  First edition  128 samples: 1.19%
+
+PASSED: 0 failed
